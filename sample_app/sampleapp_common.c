@@ -1640,13 +1640,16 @@ static void app_handle_cyclic_data (
    /* Prepare input data (for sending to IO-controller) */
    /* Lowest 7 bits: Counter    Most significant bit: Button */
    p_inputdata[0] = data_ctr;
+   p_inputdata[1] = data_ctr;
    if (button_pressed)
    {
       p_inputdata[0] |= 0x80;
+      p_inputdata[1] = data_ctr;
    }
    else
    {
       p_inputdata[0] &= 0x7F;
+      p_inputdata[1] = data_ctr;
    }
 
    for (slot = 0; slot < PNET_MAX_SLOTS; slot++)
@@ -1713,33 +1716,31 @@ static void app_handle_cyclic_data (
                &outputdata_length,
                &outputdata_iops);
 
-            /* Set data LED state from outputdata only in lowest slotnumber */
-            if (has_set_led_state == false)
+            printf(outputdata);
+
+            if (outputdata_length != APP_DATASIZE_OUTPUT)
             {
-               if (outputdata_length != APP_DATASIZE_OUTPUT)
+               printf ("Wrong outputdata length: %u\n", outputdata_length);
+               app_set_outputs_default_value (
+                  p_appdata->arguments.verbosity);
+            }
+            else if (outputdata_iops == PNET_IOXS_GOOD)
+            {
+               /* Extract LED state from most significant bit */
+               led_state = (outputdata[0] & 0x80) > 0;
+               app_handle_data_led_state (
+                  led_state,
+                  p_appdata->arguments.verbosity);
+               has_set_led_state = true;
+            }
+            else
+            {
+               if (p_appdata->arguments.verbosity > 1)
                {
-                  printf ("Wrong outputdata length: %u\n", outputdata_length);
-                  app_set_outputs_default_value (
-                     p_appdata->arguments.verbosity);
+                  printf ("Wrong IOPS: %u\n", outputdata_iops);
                }
-               else if (outputdata_iops == PNET_IOXS_GOOD)
-               {
-                  /* Extract LED state from most significant bit */
-                  led_state = (outputdata[0] & 0x80) > 0;
-                  app_handle_data_led_state (
-                     led_state,
-                     p_appdata->arguments.verbosity);
-                  has_set_led_state = true;
-               }
-               else
-               {
-                  if (p_appdata->arguments.verbosity > 1)
-                  {
-                     printf ("Wrong IOPS: %u\n", outputdata_iops);
-                  }
-                  app_set_outputs_default_value (
-                     p_appdata->arguments.verbosity);
-               }
+               app_set_outputs_default_value (
+                  p_appdata->arguments.verbosity);
             }
          }
       }
